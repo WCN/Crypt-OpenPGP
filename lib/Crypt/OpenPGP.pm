@@ -1,10 +1,9 @@
-# $Id: OpenPGP.pm,v 1.90 2002/12/10 01:43:00 btrott Exp $
-
 package Crypt::OpenPGP;
 use strict;
+use 5.008_001;
 
 use vars qw( $VERSION );
-$VERSION = '1.03';
+$VERSION = '1.04';
 
 use Crypt::OpenPGP::Constants qw( DEFAULT_CIPHER );
 use Crypt::OpenPGP::KeyRing;
@@ -15,6 +14,9 @@ use Crypt::OpenPGP::Config;
 
 use Crypt::OpenPGP::ErrorHandler;
 use base qw( Crypt::OpenPGP::ErrorHandler );
+
+use File::HomeDir;
+use File::Spec;
 
 use vars qw( %COMPAT );
 
@@ -31,6 +33,12 @@ $Crypt::OpenPGP::Globals::Trim_trailing_ws = 1;
         return @paths ? @paths : ();
     };
 
+    my $home = sub {
+        my( @path ) = @_;
+        my $home_dir = File::HomeDir->my_home or return;
+        return File::Spec->catfile( $home_dir, @path );
+    };
+
     %COMPAT = (
         PGP2 => {
               'sign'    => { Digest => 'MD5', Version => 3 },
@@ -39,15 +47,15 @@ $Crypt::OpenPGP::Globals::Trim_trailing_ws = 1;
                              Version => 3, Digest => 'MD5' },
               'PubRing' => [
                      $env->('PGPPATH','pubring.pgp'),
-                     $env->('HOME', '.pgp/pubring.pgp'),
+                     $home->( '.pgp', 'pubring.pgp' ),
               ],
               'SecRing' => [
                      $env->('PGPPATH','secring.pgp'),
-                     $env->('HOME', '.pgp/secring.pgp'),
+                     $home->( '.pgp', 'secring.pgp' ),
               ],
               'Config'  => [
                      $env->('PGPPATH', 'config.txt'),
-                     $env->('HOME', '.pgp/config.txt'),
+                     $home->( '.pgp', 'config.txt' ),
               ],
         },
 
@@ -58,15 +66,15 @@ $Crypt::OpenPGP::Globals::Trim_trailing_ws = 1;
                              Version => 4, Digest => 'SHA1' },
               'PubRing' => [
                      $env->('PGPPATH','pubring.pkr'),
-                     $env->('HOME', '.pgp/pubring.pkr'),
+                     $home->( '.pgp', 'pubring.pkr' ),
               ],
               'SecRing' => [
                      $env->('PGPPATH','secring.skr'),
-                     $env->('HOME', '.pgp/secring.skr'),
+                     $home->( '.pgp', 'secring.skr' ),
               ],
               'Config'  => [
                      $env->('PGPPATH', 'pgp.cfg'),
-                     $env->('HOME', '.pgp/pgp.cfg'),
+                     $home->( '.pgp', 'pgp.cfg' ),
               ],
         },
 
@@ -78,15 +86,15 @@ $Crypt::OpenPGP::Globals::Trim_trailing_ws = 1;
                              Version => 4, Digest => 'RIPEMD160' },
               'Config'  => [
                      $env->('GNUPGHOME', 'options'),
-                     $env->('HOME', '.gnupg/options'),
+                     $home->( '.gnupg', 'options' ),
               ],
               'PubRing' => [
                      $env->('GNUPGHOME', 'pubring.gpg'),
-                     $env->('HOME', '.gnupg/pubring.gpg'),
+                     $home->( '.gnupg', 'pubring.gpg' ),
               ],
               'SecRing' => [
                      $env->('GNUPGHOME', 'secring.gpg'),
-                     $env->('HOME', '.gnupg/secring.gpg'),
+                     $home->( '.gnupg', 'secring.gpg' ),
               ],
         },
     );
@@ -785,31 +793,46 @@ Crypt::OpenPGP - Pure-Perl OpenPGP implementation
 =head1 SYNOPSIS
 
     my $pgp = Crypt::OpenPGP->new;
+
+    # Given an input stream (could be a signature, ciphertext, etc),
+    # do the "right thing" to it.
+    my $message_body; $message_body .= $_ while <STDIN>;
     my $result = $pgp->handle( Data => $message_body );
 
+    # Create a detached, ASCII-armoured signature of $file using the
+    # secret key $key_id, protected with the passphrase $pass. 
+    my $file = 'really-from-me.txt';
+    my $key_id = '...';
+    my $pass = 'foo bar';
     my $signature = $pgp->sign(
-                   Filename   => $file,
-                   KeyID      => $key_id,
-                   Passphrase => $pass,
-                   Detach     => 1,
-                   Armour     => 1,
-             );
+        Filename   => $file,
+        KeyID      => $key_id,
+        Passphrase => $pass,
+        Detach     => 1,
+        Armour     => 1,
+    );
 
-    my $valid = $pgp->verify(
-                   Signature  => $signature,
-                   Files      => [ $file ],
-             );
+    # Verify the detached signature $signature, which should be of the
+    # source file $file.
+    my $is_valid = $pgp->verify(
+        Signature  => $signature,
+        Files      => [ $file ],
+    );
 
+    # Using the public key associated with $key_id, encrypt the contents
+    # of the file $file, and ASCII-armour the ciphertext.
     my $ciphertext = $pgp->encrypt(
-                   Filename   => $file,
-                   Recipients => $key_id,
-                   Armour     => 1,
-             );
+        Filename   => $file,
+        Recipients => $key_id,
+        Armour     => 1,
+    );
 
+    # Decrypt $ciphertext using the secret key used to encrypt it,
+    # which key is protected with the passphrase $pass.
     my $plaintext = $pgp->decrypt(
-                   Data       => $ciphertext,
-                   Passphrase => $pass,
-             );
+        Data       => $ciphertext,
+        Passphrase => $pass,
+    );
 
 =head1 DESCRIPTION
 

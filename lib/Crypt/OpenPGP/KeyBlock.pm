@@ -1,5 +1,3 @@
-# $Id: KeyBlock.pm,v 1.6 2002/12/10 01:45:34 btrott Exp $
-
 package Crypt::OpenPGP::KeyBlock;
 use strict;
 
@@ -87,6 +85,7 @@ Crypt::OpenPGP::KeyBlock - Key block object
 
     use Crypt::OpenPGP::KeyBlock;
 
+    my $packet = Crypt::OpenPGP::UserID->new( Identity => 'foo' );
     my $kb = Crypt::OpenPGP::KeyBlock->new;
     $kb->add($packet);
 

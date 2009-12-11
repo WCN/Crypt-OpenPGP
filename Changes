@@ -1,6 +1,26 @@
-$Id: Changes,v 1.68 2002/12/10 01:48:30 btrott Exp $
-
 Revision history for Crypt::OpenPGP
+
+1.04 2009.12.10
+    - Keyring lookup by uid is now case-insensitive to match the behavior
+      in GnuPG. Fixes http://rt.cpan.org/Public/Bug/Display.html?id=2225
+    - Got rid of a warning in Crypt::OpenPGP::SKSessionKey related to
+      broken calculation of the session_key; that session_key value was
+      never used, so I removed the code generating the key, hence removing
+      the warning. Addresses
+      http://rt.cpan.org/Public/Bug/Display.html?id=29950
+    - Default key and config file locations (in compatibility mode) now work
+      on Windows. Fixes http://rt.cpan.org/Public/Bug/Display.html?id=18815
+    - Updated to use Module::Install. Addresses
+      http://rt.cpan.org/Public/Bug/Display.html?id=35983 and
+      http://rt.cpan.org/Public/Bug/Display.html?id=31411
+    - Made all dependencies required, rather than optional based on
+      feature packages. Simplifies distribution and packaging, and addresses
+      http://rt.cpan.org/Public/Bug/Display.html?id=41426
+    - Removed sign() and auto_install() from Makefile.PL.
+    - Removed magic svn keywords.
+    - Converted test suite to Test::More.
+    - Added author tests (xt/) and modified SYNOPSIS for all modules to
+      make them pass the compilation test.
 
 1.03 2002.12.09
     - Makefile.PL now uses ExtUtils::AutoInstall. Thanks to Autrijus Tang

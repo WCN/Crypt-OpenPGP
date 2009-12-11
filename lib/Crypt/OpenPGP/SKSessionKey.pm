@@ -1,5 +1,3 @@
-# $Id: SKSessionKey.pm,v 1.1 2001/07/29 13:21:06 btrott Exp $
-
 package Crypt::OpenPGP::SKSessionKey;
 use strict;
 
@@ -28,7 +26,6 @@ sub init {
         $sym_key = substr $sym_key, 0, $keysize;
         my $s2k_key = $key->{s2k}->generate($pass, $keysize);
         $cipher->init($s2k_key);
-        $key->{session_key} = $cipher->encrypt($key->{sym_alg} . $sym_key);
     }
     $key;
 }
@@ -54,7 +51,6 @@ sub save {
     $buf->put_int8($key->{version});
     $buf->put_int8($key->{s2k_ciph});
     $buf->put_bytes( $key->{s2k}->save );
-    #$buf->put_bytes($key->{session_key});
     $buf->bytes;
 }
 
@@ -87,16 +83,14 @@ Crypt::OpenPGP::SKSessionKey - Symmetric-Key Encrypted Session Key
 
     use Crypt::OpenPGP::SKSessionKey;
 
-    my $key_data = 'f' x 64;    ## Not a very good key :)
+    my $passphrase = 'foobar';  # Not a very good passphrase
+    my $key_data = 'f' x 64;    # Not a very good key
 
-    my $skey = Crypt::OpenPGP::SessionKey->new(
-                            Passphrase => $passphrase,
-                            SymKey => $key_data,
-                    );
+    my $skey = Crypt::OpenPGP::SKSessionKey->new(
+        Passphrase  => $passphrase,
+        SymKey      => $key_data,
+    );
     my $serialized = $skey->save;
-
-    my $skey = Crypt::OpenPGP::SKSessionKey->parse($buffer);
-    my($key_data, $alg) = $skey->decrypt($passphrase);
 
 =head1 DESCRIPTION
 

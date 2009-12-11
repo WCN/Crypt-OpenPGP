@@ -1,5 +1,3 @@
-# $Id: Trust.pm,v 1.3 2001/07/29 06:34:29 btrott Exp $
-
 package Crypt::OpenPGP::Trust;
 use strict;
 
@@ -22,11 +20,6 @@ __END__
 =head1 NAME
 
 Crypt::OpenPGP::Trust - PGP Trust packet
-
-=head1 SYNOPSIS
-
-    use Crypt::OpenPGP::Trust;
-    my $trust = Crypt::OpenPGP::Trust->parse($buffer);
 
 =head1 DESCRIPTION
 

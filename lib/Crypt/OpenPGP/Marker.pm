@@ -1,5 +1,3 @@
-# $Id: Marker.pm,v 1.2 2001/07/29 04:26:05 btrott Exp $
-
 package Crypt::OpenPGP::Marker;
 use strict;
 
@@ -21,11 +19,6 @@ __END__
 =head1 NAME
 
 Crypt::OpenPGP::Marker - PGP Marker packet
-
-=head1 SYNOPSIS
-
-    use Crypt::OpenPGP::Marker;
-    my $marker = Crypt::OpenPGP::Marker->parse($buffer);
 
 =head1 DESCRIPTION
 

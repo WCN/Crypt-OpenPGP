@@ -1,5 +1,3 @@
-# $Id: KeyRing.pm,v 1.19 2002/01/29 01:19:46 btrott Exp $
-
 package Crypt::OpenPGP::KeyRing;
 use strict;
 
@@ -101,7 +99,7 @@ sub find_keyblock_by_keyid {
 sub find_keyblock_by_uid {
     my $ring = shift;
     my($uid) = @_;
-    $ring->find_keyblock(sub { $_[0]->id =~ /$uid/ },
+    $ring->find_keyblock(sub { $_[0]->id =~ /$uid/i },
         [ PGP_PKT_USER_ID ], 1 );
 }
 
@@ -178,6 +176,7 @@ Crypt::OpenPGP::KeyRing - Key ring object
 
     my $ring = Crypt::OpenPGP::KeyRing->new( Filename => 'foo.ring' );
 
+    my $key_id = '...';
     my $kb = $ring->find_keyblock_by_keyid($key_id);
 
 =head1 DESCRIPTION

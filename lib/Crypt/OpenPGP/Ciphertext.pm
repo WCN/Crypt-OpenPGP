@@ -1,5 +1,3 @@
-# $Id: Ciphertext.pm,v 1.16 2002/07/15 07:07:30 btrott Exp $
-
 package Crypt::OpenPGP::Ciphertext;
 use strict;
 
@@ -120,13 +118,14 @@ Crypt::OpenPGP::Ciphertext - Encrypted data packet
     my $key_data = 'f' x 64;    ## Not a very good key :)
 
     my $ct = Crypt::OpenPGP::Ciphertext->new(
-                              Data   => "foo bar baz",
-                              SymKey => $key_data,
-                    );
+        Data   => "foo bar baz",
+        SymKey => $key_data,
+    );
     my $serialized = $ct->save;
 
-    my $ct = Crypt::OpenPGP::Ciphertext->parse($buffer);
-    my $data = $ct->decrypt($key_data);
+    my $buffer = Crypt::OpenPGP::Buffer->new;
+    my $ct2 = Crypt::OpenPGP::Ciphertext->parse( $buffer );
+    my $data = $ct->decrypt( $key_data );
 
 =head1 DESCRIPTION
 

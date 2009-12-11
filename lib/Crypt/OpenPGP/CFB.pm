@@ -1,5 +1,3 @@
-# $Id: CFB.pm,v 1.5 2001/08/09 05:35:27 btrott Exp $
-
 # This code based slightly on the Systemics Crypt::CFB.
 # Parts Copyright (C) 1995, 1996 Systemics Ltd (http://www.systemics.com/)
 # All rights reserved.
@@ -80,12 +78,14 @@ Crypt::OpenPGP::CFB - PGP Cipher Feedback Mode
 
     use Crypt::OpenPGP::CFB;
 
-    my $cipher = Crypt::Blowfish->new($key);   ## for example
-    my $cfb = Crypt::OpenPGP::CFB->new($cipher, $iv);
+    my $key = 'foo bar';
+    my $cipher = Crypt::Blowfish->new( $key );   # for example
+    my $cfb = Crypt::OpenPGP::CFB->new( $cipher );
 
-    my $ct = $cfb->encrypt($plaintext);
+    my $plaintext = 'this is secret!';
+    my $ct = $cfb->encrypt( $plaintext );
 
-    my $pt = $cfb->decrypt($ct);
+    my $pt = $cfb->decrypt( $ct );
 
 =head1 DESCRIPTION
 

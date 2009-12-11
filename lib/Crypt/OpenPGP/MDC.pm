@@ -1,5 +1,3 @@
-# $Id: MDC.pm,v 1.2 2001/08/09 18:57:24 btrott Exp $
-
 package Crypt::OpenPGP::MDC;
 use strict;
 
@@ -48,9 +46,6 @@ Crypt::OpenPGP::MDC - MDC (modification detection code) packet
     my $mdc = Crypt::OpenPGP::MDC->new( Data => 'foobar' );
     my $digest = $mdc->digest;
     my $serialized = $mdc->save;
-
-    my $mdc = Crypt::OpenPGP::MDC->parse($buffer);
-    my $digest = $mdc->digest;
 
 =head1 DESCRIPTION
 

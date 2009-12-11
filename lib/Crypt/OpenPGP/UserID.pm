@@ -1,5 +1,3 @@
-# $Id: UserID.pm,v 1.6 2001/08/09 18:57:07 btrott Exp $
-
 package Crypt::OpenPGP::UserID;
 use strict;
 
@@ -44,8 +42,6 @@ Crypt::OpenPGP::UserID - PGP User ID packet
 
     my $uid = Crypt::OpenPGP::UserID->new( Identity => 'Foo' );
     my $serialized = $uid->save;
-
-    my $uid = Crypt::OpenPGP::UserID->parse($buffer);
     my $identity = $uid->id;
 
 =head1 DESCRIPTION

@@ -1,5 +1,3 @@
-# $Id: Words.pm,v 1.2 2001/08/10 06:24:04 btrott Exp $
-
 package Crypt::OpenPGP::Words;
 use strict;
 
@@ -174,6 +172,7 @@ Crypt::OpenPGP::Words - Create English-word encodings
 =head1 SYNOPSIS
 
     use Crypt::OpenPGP::Words;
+    my $cert = Crypt::OpenPGP::Certificate->new;
     my @words = Crypt::OpenPGP::Words->encode( $cert->fingerprint );
 
 =head1 DESCRIPTION

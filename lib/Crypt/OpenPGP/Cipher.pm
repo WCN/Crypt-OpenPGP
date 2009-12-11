@@ -1,5 +1,3 @@
-# $Id: Cipher.pm,v 1.19 2002/12/10 01:43:55 btrott Exp $
-
 package Crypt::OpenPGP::Cipher;
 use strict;
 
@@ -160,8 +158,10 @@ Crypt::OpenPGP::Cipher - PGP symmetric cipher factory
 
     use Crypt::OpenPGP::Cipher;
 
-    my $cipher = Crypt::OpenPGP::Cipher->new($name);
+    my $alg = 'Rijndael';
+    my $cipher = Crypt::OpenPGP::Cipher->new( $alg );
 
+    my $plaintext = 'foo bar';
     my $ct = $cipher->encrypt($plaintext);
     my $pt = $cipher->decrypt($ct);
 

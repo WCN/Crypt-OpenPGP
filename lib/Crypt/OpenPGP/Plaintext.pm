@@ -1,5 +1,3 @@
-# $Id: Plaintext.pm,v 1.7 2001/07/29 17:08:56 btrott Exp $
-
 package Crypt::OpenPGP::Plaintext;
 use strict;
 
@@ -61,13 +59,14 @@ Crypt::OpenPGP::Plaintext - A plaintext, literal-data packet
 
     use Crypt::OpenPGP::Plaintext;
 
+    my $data = 'foo bar';
+    my $file = 'foo.txt';
+
     my $pt = Crypt::OpenPGP::Plaintext->new(
                              Data     => $data,
                              Filename => $file,
                     );
     my $serialized = $pt->save;
-
-    my $pt = Crypt::OpenPGP::Plaintext->parse($buffer);
 
 =head1 DESCRIPTION
 

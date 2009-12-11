@@ -1,5 +1,3 @@
-# $Id: OnePassSig.pm,v 1.4 2001/07/29 17:42:59 btrott Exp $
-
 package Crypt::OpenPGP::OnePassSig;
 use strict;
 
@@ -24,12 +22,6 @@ __END__
 =head1 NAME
 
 Crypt::OpenPGP::OnePassSig - One-Pass Signature packet
-
-=head1 SYNOPSIS
-
-    use Crypt::OpenPGP::OnePassSig;
-
-    my $onepass = Crypt::OpenPGP::OnePassSig->parse($buffer);
 
 =head1 DESCRIPTION
 

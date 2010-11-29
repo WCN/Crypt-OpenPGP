@@ -19,25 +19,35 @@ sub new {
 }
 
 sub init {
-    my $ring = shift;
-    my %param = @_;
-    $ring->{_data} = $param{Data} || '';
-    if (!$ring->{_data} && (my $file = $param{Filename})) {
-        local *FH;
-        open FH, $file or
-            return (ref $ring)->error("Can't open keyring $file: $!");
-        binmode FH;
-        { local $/; $ring->{_data} = <FH> }
-        close FH;
-    }
-    if ($ring->{_data} =~ /-----BEGIN/) {
+  my($ring, %param) = @_;
+
+  if($param{Data}) {
+    $ring->{_data} = $param{Data};
+  }
+  else {
+    my(@files, @data);
+    push(@files, $param{Filename}) if $param{Filename};
+    push(@files, @{$param{Files}}) if $param{Files};
+    foreach my $file (@files) {
+      my $fh;
+      open $fh, $file or
+        return (ref $ring)->error("Can't open keyring $file: $!");
+      binmode $fh;
+      my $data = do { local $/; <$fh> };
+      close $fh;
+
+      if ($data =~ /-----BEGIN/) {
         require Crypt::OpenPGP::Armour;
-        my $rec = Crypt::OpenPGP::Armour->unarmour($ring->{_data}) or
-            return (ref $ring)->error("Unarmour failed: " .
-                Crypt::OpenPGP::Armour->errstr);
-        $ring->{_data} = $rec->{Data};
+        my $rec = Crypt::OpenPGP::Armour->unarmour($data) or
+          return (ref $ring)->error("Unarmour failed: " .
+                                      Crypt::OpenPGP::Armour->errstr);
+        $data = $rec->{Data};
+      }
+      push(@data, $data);
     }
-    $ring;
+    $ring->{_data} = join("", @data);
+  }
+  $ring;
 }
 
 sub save {

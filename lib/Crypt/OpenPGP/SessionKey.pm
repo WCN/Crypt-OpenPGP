@@ -59,20 +59,28 @@ sub save {
     $buf->put_bytes($key->{key_id}, 8);
     $buf->put_int8($key->{pk_alg});
     my $c = $key->{C};
-    for my $mp (values %$c) {
-        $buf->put_mp_int($mp);
+    my $pk = Crypt::OpenPGP::Key::Public->new($key->{pk_alg});
+    my @props = $pk->crypt_props;
+    for my $e (@props) {
+        $buf->put_mp_int($key->{C}{$e});
     }
     $buf->bytes;
 }
 
 sub display {
     my $key = shift;
-    my $str = sprintf ":pubkey enc packet: version %d, algo %d, keyid %s\n",
-        $key->{version}, $key->{pk_alg}, uc unpack('H*', $key->{key_id});
+    my $str = sprintf("%s: version %d, algo %d, keyid %s\n",
+                      __PACKAGE__,  $key->{version}, $key->{pk_alg},
+                      $key->key_id_hex);
     for my $mp (values %{ $key->{C} }) {
         $str .= sprintf "        data: [%d bits]\n", bitsize($mp);
     }
     $str;
+}
+
+sub key_id_hex {
+    my $key = shift;
+    return uc unpack('H*', $key->{key_id});
 }
 
 sub decrypt {

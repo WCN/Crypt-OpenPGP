@@ -8,22 +8,77 @@ use Crypt::OpenPGP::Constants qw( DEFAULT_DIGEST );
 use Crypt::OpenPGP::ErrorHandler;
 use base qw( Crypt::OpenPGP::ErrorHandler );
 
+use vars qw( %SIGNATURE_TYPES );
+%SIGNATURE_TYPES = (
+  0x00      => 'Signature of Binary Document',
+  0x01      => 'Signature of Canonical Text Document',
+  0x02      => 'Standalone Signature',
+  0x10      => 'Generic Certification of User Id and Public Key',
+  0x11      => 'Persona Certification of User Id and Public Key',
+  0x12      => 'Casual Certification of User Id and Public Key',
+  0x13      => 'Positive Certification of User Id and Public Key',
+  0x18      => 'Subkey Binding Signature',
+  0x19      => 'Primary Key Binding Signature',
+  0x1f      => 'Signature directly on a key',
+  0x20      => 'Key Revocation Signature',
+  0x28      => 'SubKey Revocation Signature',
+  0x30      => 'Certification Revocation Signature',
+  0x40      => 'Timestamp Signature',
+  0x50      => 'Third Party Confirmation Signature',
+);
+
 sub pkt_hdrlen { 2 }
 
 sub key_id {
     my $sig = shift;
     unless ($sig->{key_id}) {
         my $sp = $sig->find_subpacket(16);
-        $sig->{key_id} = $sp->{data};
+        $sig->{key_id} = $sp->data if $sp;
     }
     $sig->{key_id};
 }
 
+sub key_id_hex {
+    my $sig = shift;
+    return uc unpack('H*', $sig->key_id);
+}
+
 sub timestamp {
     my $sig = shift;
-    $sig->{version} < 4 ?
-        $sig->{timestamp} :
-        $sig->find_subpacket(2)->{data};
+    return $sig->{timestamp} if $sig->{version} < 4;
+    my $sp = $sig->find_subpacket(2) || return;
+    return $sp->data;
+}
+
+sub expiration_time {
+    my $sig = shift;
+    return $sig->{timestamp} if $sig->{version} < 4;
+    my $sp = $sig->find_subpacket(2) || return;
+    return $sp->data;
+}
+
+sub primary_user_id {
+    my $sig = shift;
+    my $sp = $sig->find_subpacket(25) || return;
+    return $sp->data;
+}
+
+sub preferred_symmetric_algorithms {
+    my $sig = shift;
+    my $sp = $sig->find_subpacket(11) || return;
+    return $sp->data;
+}
+
+sub preferred_hash_algorithms {
+    my $sig = shift;
+    my $sp = $sig->find_subpacket(21) || return;
+    return $sp->data;
+}
+
+sub preferred_compression_algorithms {
+    my $sig = shift;
+    my $sp = $sig->find_subpacket(22) || return;
+    return $sp->data;
 }
 
 sub digest {
@@ -40,10 +95,61 @@ sub find_subpacket {
     }
 }
 
+sub signature_type {
+  my $sp = shift;
+  return $SIGNATURE_TYPES{ $sp->{'type'} } || "UNKNOWN";
+}
+
+sub signature_data {
+  my $sig = shift;
+  my $key = Crypt::OpenPGP::Key::Public->new($sig->{pk_alg})
+    or return $sig->error(Crypt::OpenPGP::Key::Public->errstr);
+  my @props = $key->sig_props;
+  my %out;
+  for my $e (@props) {
+    $out{$e} = $sig->{$e};
+  }
+  return \%out;
+}
+
 sub new {
     my $class = shift;
     my $sig = bless { }, $class;
     $sig->init(@_);
+}
+
+sub display {
+  my $self = shift;
+
+  my $alg  = Crypt::OpenPGP::Key->alg($self->{'pk_alg'});
+  my $hash = Crypt::OpenPGP::Digest->alg($self->{'hash_alg'});
+  my @lines;
+
+  my $str = sprintf("%s: version %d, type %d (%s), algo: %s, %s\n",
+                    __PACKAGE__, $self->{'version'}, $self->{'type'},
+                    $self->signature_type, $alg, $hash);
+  push(@lines, $str);
+
+  if($self->{'version'} < 4) {
+
+  }
+  else {
+    push(@lines, "  HASHED SUBPACKETS:\n");
+    foreach my $subpacket (@{$self->{'subpackets_hashed'}}) {
+      my @tmp = $subpacket->display;
+      foreach my $line (@tmp) {
+        push(@lines, "    $line");
+      }
+    }
+    push(@lines, "  UNHASHED SUBPACKETS:\n");
+    foreach my $subpacket (@{$self->{'subpackets_unhashed'}}) {
+      my @tmp = $subpacket->display;
+      foreach my $line (@tmp) {
+        push(@lines, "    $line");
+      }
+    }
+  }
+  return @lines;
 }
 
 sub init {
@@ -63,15 +169,23 @@ sub init {
             $sig->{hash_len} = 5;
         }
         else {
-            my $sp = Crypt::OpenPGP::Signature::SubPacket->new;
-            $sp->{type} = 2;
-            $sp->{data} = time;
-            push @{ $sig->{subpackets_hashed} }, $sp;
-            $sp = Crypt::OpenPGP::Signature::SubPacket->new;
-            $sp->{type} = 16;
-            $sp->{data} = $cert->key_id;
-            push @{ $sig->{subpackets_unhashed} }, $sp;
+          my $sp = Crypt::OpenPGP::Signature::SubPacket->new({
+            'type'     => 2,
+            'data'     => time(),
+          });
+          push(@{ $sig->{'subpackets_hashed'} }, $sp);
+
+          foreach my $sp (@{ $param{'SubPacket'} || [] }) {
+            push(@{ $sig->{'subpackets_hashed'} }, $sp);
+          }
+
+          $sp = Crypt::OpenPGP::Signature::SubPacket->new({
+            'type'     => 16,
+            'data'     => $cert->key_id,
+          });
+          push(@{ $sig->{'subpackets_unhashed'} }, $sp);
         }
+
         my $hash = $sig->hash_data(ref($obj) eq 'ARRAY' ? @$obj : $obj);
         $sig->{chk} = substr $hash, 0, 2;
         my $sig_data = $cert->key->sign($hash,
@@ -410,10 +524,32 @@ Returns the ID of the key that created the signature.
 Returns the time that the signature was created in Unix epoch time (seconds
 since 1970).
 
+=head2 $sig->expiration_time
+
+Returns the unix time at which the signature expires.
+
 =head2 $sig->digest
 
 Returns a Crypt::OpenPGP::Digest object representing the digest algorithm
 used by the signature.
+
+=head2 $sub->preferred_symmetric_algorithms
+
+Returns an arrayref of the key issuer's preferred symmetric encryption
+algorithms. This will be an arrayref of numbers, which can be looked
+up via L<Crypt::OpenPGP::Cipher>
+
+=head2 $sub->preferred_hash_algorithms
+
+Returns an arrayref of the key issuer's preferred hash digest
+algorithms. This will be an arrayref of numbers, which can be looked
+up via L<Crypt::OpenPGP::Digest>
+
+=head2 $sub->preferred_compression_algorithms
+
+Returns an arrayref of the key issuer's preferred compression
+algorithms. This will be an arrayref of numbers, which can be looked
+up via L<Crypt::OpenPGP::Compressed>
 
 =head1 AUTHOR & COPYRIGHTS
 

@@ -48,7 +48,10 @@ sub init { $_[0] }
 
 sub check { 1 }
 
-sub alg { $_[0]->{__alg} }
+sub alg {
+    return $_[0]->{__alg} if ref($_[0]);
+    $ALG{$_[1]} || $_[1];
+}
 sub alg_id { $_[0]->{__alg_id} }
 
 sub size { 0 }
@@ -59,6 +62,29 @@ sub is_secret { 0 }
 
 sub can_encrypt { 0 }
 sub can_sign { 0 }
+
+sub display {
+  my $key = shift;
+  my @lines;
+
+  push(@lines, sprintf("%s: size: %d algo: %s\n",
+                       __PACKAGE__, $key->size, $key->alg));
+  push(@lines, sprintf("    can_encrypt: %d can_sign: %d is_secret: %d\n",
+                       $key->can_encrypt, $key->can_sign, $key->is_secret));
+
+  foreach my $prop ( $key->public_props, $key->crypt_props ) {
+    my $val = $key->{'key_data'}->{$prop} || next;
+    my @val;
+    while($val =~ s/^(.{1,70})//) {
+      push(@val, $1);
+    }
+    push(@lines, sprintf("    %s: %s\n", $prop, shift(@val)));
+    while(@val) {
+      push(@lines, sprintf("       %s\n", shift(@val)));
+    }
+  }
+  return @lines;
+}
 
 sub DESTROY { }
 

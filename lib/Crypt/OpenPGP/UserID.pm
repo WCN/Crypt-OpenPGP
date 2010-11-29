@@ -29,6 +29,11 @@ sub parse {
 
 sub save { $_[0]->{id} }
 
+sub display {
+  my $self = shift;
+  return sprintf("%s: %s\n", __PACKAGE__, $self->{'id'});
+}
+
 1;
 __END__
 

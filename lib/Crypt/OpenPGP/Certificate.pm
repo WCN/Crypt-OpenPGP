@@ -78,6 +78,7 @@ sub uid {
     $cert->{_uid};
 }
 
+
 sub public_cert {
     my $cert = shift;
     return $cert unless $cert->is_secret;
@@ -137,6 +138,23 @@ sub _gen_v4_fingerprint {
     my $dgst = Crypt::OpenPGP::Digest->new('SHA1');
     $dgst->hash($buf->bytes);
 }
+
+sub display {
+  my $cert = shift;
+  my $key  = $cert->key;
+
+  my @lines;
+  push(@lines, sprintf("%s: id: %s version: %d is_secret: %d is_subkey: %d is_protected\n",
+                       __PACKAGE__, $cert->key_id_hex, $cert->version, $cert->is_secret,
+                       $cert->is_subkey, $cert->is_protected));
+  push(@lines, sprintf("    fingerprint: %s\n", $cert->fingerprint_hex));
+
+  foreach my $line ($cert->key->display) {
+    push(@lines, "  $line");
+  }
+  return @lines;
+}
+
 
 sub parse {
     my $class = shift;

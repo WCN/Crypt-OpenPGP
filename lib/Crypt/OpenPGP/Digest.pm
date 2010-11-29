@@ -6,16 +6,16 @@ use base qw( Crypt::OpenPGP::ErrorHandler );
 
 use vars qw( %ALG %ALG_BY_NAME );
 %ALG = (
-    1 => 'MD5',
-    2 => 'SHA1',
-    3 => 'RIPEMD160',
+    1 => { 'name' => 'MD5', 'size' => 16 },
+    2 => { 'name' => 'SHA1', 'size' => 20 },
+    3 => { 'name' => 'RIPEMD160', 'size' => 20 },
 );
-%ALG_BY_NAME = map { $ALG{$_} => $_ } keys %ALG;
+%ALG_BY_NAME = map { $ALG{$_}->{'name'} => $_ } keys %ALG;
 
 sub new {
     my $class = shift;
     my $alg = shift;
-    $alg = $ALG{$alg} || $alg;
+    $alg = $ALG{$alg}->{'name'} || $alg;
     return $class->error("Unsupported digest algorithm '$alg'")
         unless $alg =~ /^\D/;
     my $pkg = join '::', $class, $alg;
@@ -29,14 +29,17 @@ sub hash { $_[0]->{md}->($_[1]) }
 
 sub alg {
     return $_[0]->{__alg} if ref($_[0]);
-    $ALG{$_[1]} || $_[1];
+    $ALG{$_[1]}->{'name'} || $_[1];
 }
 
 sub alg_id {
     return $_[0]->{__alg_id} if ref($_[0]);
     $ALG_BY_NAME{$_[1]} || $_[1];
 }
-
+sub alg_size {
+  my $algId = ref($_[0]) ? $_[0]->{'__alg_id'} : $_[1];
+  return $ALG{$algId}->{'size'} || 0;
+}
 sub supported {
     my $class = shift;
     my %s;
@@ -45,6 +48,11 @@ sub supported {
         $s{$did} = $digest->alg if $digest;
     }
     \%s;
+}
+
+sub display {
+  my $dig = shift;
+  return sprintf("%s: %s\n", $dig->alg, $dig->hash);
 }
 
 package Crypt::OpenPGP::Digest::MD5;
@@ -138,6 +146,10 @@ Returns the name of the digest algorithm (as listed above in I<new>).
 =head2 $dgst->alg_id
 
 Returns the numeric ID of the digest algorithm.
+
+=head2 $dgst->alg_size()
+
+Returns the size (in bytes) of hashes produced by this algorithm.
 
 =head1 AUTHOR & COPYRIGHTS
 

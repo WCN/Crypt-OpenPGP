@@ -14,22 +14,29 @@ sub primary_uid {
 sub key { $_[0]->get('Crypt::OpenPGP::Certificate')->[0] }
 sub subkey { $_[0]->get('Crypt::OpenPGP::Certificate')->[1] }
 
+## TODO - look at signatures, and key flags, to work out which of
+## the keys to actually use. For now, this works fine.
+##
 sub encrypting_key {
     my $kb = shift;
-    my $keys = $kb->get('Crypt::OpenPGP::Certificate');
-    return unless $keys && @$keys;
-    for my $key (@$keys) {
-        return $key if $key->can_encrypt;
+    my @keys = grep { $_->can_encrypt }
+        @{ $kb->{pkt}->{'Crypt::OpenPGP::Certificate'} };
+    if(@keys > 1) {
+        my @subkeys = grep { $_->is_subkey } @keys;
+        return $subkeys[0] if @subkeys;
     }
+    return $keys[0];
 }
 
 sub signing_key {
     my $kb = shift;
-    my $keys = $kb->get('Crypt::OpenPGP::Certificate');
-    return unless $keys && @$keys;
-    for my $key (@$keys) {
-        return $key if $key->can_sign;
+    my @keys = grep { $_->can_encrypt }
+        @{ $kb->{pkt}->{'Crypt::OpenPGP::Certificate'} };
+    if(@keys > 1) {
+        my @masterkeys = grep { ! $_->is_subkey } @keys;
+        return $masterkeys[0] if @masterkeys;
     }
+    return $keys[0];
 }
 
 sub key_by_id { $_[0]->{keys_by_id}->{$_[1]} ||

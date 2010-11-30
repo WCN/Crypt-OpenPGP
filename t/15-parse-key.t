@@ -3,14 +3,13 @@
 use strict;
 use warnings;
 
-use Test::More tests => 152;
+use Test::More tests => 208;
 use FindBin '$RealBin';
 use Data::Dumper;
 
 use Crypt::OpenPGP;
 use Crypt::OpenPGP::Message;
 use Crypt::OpenPGP::KeyRing;
-
 
 
 
@@ -258,4 +257,120 @@ use Crypt::OpenPGP::KeyRing;
 
   is($kb->primary_uid, $uids[8], "Primary UID uses timestamp resolution");
 }
+
+
+
+
+## Test the bobbage key...
+{
+  ok(my $keyring = Crypt::OpenPGP::KeyRing->new(
+      Filename => "$RealBin/samples/keys/bobbage.key",
+  ), "Read the bobbage key");
+  $keyring->read();
+
+  is($keyring->keyblock_count, 1, "Contains one keyblock");
+
+  ok(my $kb = $keyring->find_keyblock_by_index(0), "Get first keyblock");
+  isa_ok($kb, "Crypt::OpenPGP::KeyBlock", "Got a keyblock ok");
+
+  ok(my @keys = $kb->all_keys(), "List all keys");
+  is(@keys, 2, "Got two keys");
+
+  is($keys[0]->key_id_hex, "BBE007BAC5D9F434", "key id ok");
+  is($keys[0]->version, 4, "Key version 4 ok");
+  is($keys[0]->timestamp, 1291078716, "Key timestamp ok");
+  is($keys[0]->pk_alg, 1, "pk_alg is RSA ok");
+  is($keys[0]->is_secret, 0, "Not a secret key");
+  is($keys[0]->is_subkey, 0, "Not a subkey");
+  ok(! $keys[0]->is_protected, "Not protected");
+  ok($keys[0]->can_encrypt, "Can encrypt");
+  is($keys[0]->can_sign, 1, "Can sign");
+  is($keys[0]->key->size, 2048, "Key size ok");
+  is($keys[0]->key->alg, "RSA", "Key algorithm, ok");
+
+  is($keys[1]->key_id_hex, "43CAE5B6F0D06794", "key id ok");
+  is($keys[1]->version, 4, "Key version 4 ok");
+  is($keys[1]->timestamp, 1291078716, "Key timestamp ok");
+  is($keys[1]->pk_alg, 1, "pk_alg is RSA ok");
+  is($keys[1]->is_secret, 0, "Not a secret key");
+  is($keys[1]->is_subkey, 1, "IS a subkey");
+  ok(! $keys[1]->is_protected, "Not protected");
+  ok($keys[1]->can_encrypt, "Can encrypt");
+  is($keys[1]->can_sign, 1, "Can sign");
+  is($keys[1]->key->size, 2048, "Key size ok");
+  is($keys[1]->key->alg, "RSA", "Key algorithm, ok");
+
+
+  ok(my @uids = $kb->all_user_ids(), "List all user ids");
+  is(@uids, 1, "Got one user id");
+  is($uids[0], 'Bob Bobbage (Mmmmm, Pie) <bob123@example.com>',
+     "User id correct");
+
+  ok(my @sigs = $kb->all_signatures(), "List all signatures");
+  is(@sigs, 2, "Got 2 signatures");
+  foreach my $sig (@sigs) {
+    is($sig->uid, $uids[0], "Sig user id ok");
+  }
+
+
+  ok(my @selfsig = $kb->all_self_sigs(), "List all self signatures");
+  is(@selfsig, 2, "Got two self signatures");
+
+  is($selfsig[0]->key_id_hex, "BBE007BAC5D9F434", "key id ok");
+  is($selfsig[0]->type, 0x13, "Sig type - link key with user id");
+  is($selfsig[0]->timestamp, 1291078716, "signature timestamp ok");
+  is($selfsig[0]->expiration_time, 31536000, "Expiration time ok");
+  is($selfsig[0]->uid, $uids[0], "Self sig user id ok");
+  ok(! $selfsig[0]->is_primary_user_id, "Not primary user id ok");
+  is_deeply($selfsig[0]->preferred_symmetric_algorithms,
+            [ 9, 8, 7, 3, 2 ],
+            "Preferred algorithms (AES 256, 192, 128), CAST5, 3DES)");
+  is_deeply($selfsig[0]->preferred_hash_algorithms,
+            [ 8, 2, 9, 10, 11 ],
+            "Preferred hashes (SHA (256, 1, 384, 512, 224)");
+  is_deeply($selfsig[0]->preferred_compression_algorithms,
+            [ 2, 3, 1 ],
+            "Preferred compression (ZLIB, BZIP2, ZIP)");
+  is_deeply($selfsig[0]->key_flags, {
+    'can_certify_other_keys'     => 1,
+    'can_sign_data'              => 1,
+    'can_encrypt_communications' => 0,
+    'can_encrypt_storage'        => 0,
+    'private_key_may_be_split'   => 0,
+    'can_use_authentication'     => 0,
+    'private_key_multiple_users' => 0,
+  }, "Key flags ok");
+
+
+  is($selfsig[1]->key_id_hex, "BBE007BAC5D9F434", "key id ok");
+  is($selfsig[1]->type, 0x18, "Sig type - subkey signing");
+  is($selfsig[1]->timestamp, 1291078716, "signature timestamp ok");
+  is($selfsig[1]->expiration_time, 31536000, "Expiration time ok");
+  is($selfsig[1]->uid, $uids[0], "Self sig user id ok");
+  ok(! $selfsig[1]->is_primary_user_id, "Not primary user id ok");
+  is_deeply($selfsig[1]->key_flags, {
+    'can_certify_other_keys'     => 0,
+    'can_sign_data'              => 0,
+    'can_encrypt_communications' => 1,
+    'can_encrypt_storage'        => 1,
+    'private_key_may_be_split'   => 0,
+    'can_use_authentication'     => 0,
+    'private_key_multiple_users' => 0,
+  }, "Key flags ok");
+
+
+
+
+  is($kb->signing_key->key_id_hex, "BBE007BAC5D9F434",
+     "master key used for signin");
+  is($kb->encrypting_key->key_id_hex, "43CAE5B6F0D06794",
+     "sub key used for encryption");
+
+
+}
+
+
+
+
+
 

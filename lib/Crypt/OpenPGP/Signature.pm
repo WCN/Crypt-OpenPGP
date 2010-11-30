@@ -58,10 +58,15 @@ sub keyblock {
     }
 }
 
+sub type {
+    my $sig = shift;
+    return $sig->{type};
+  }
+
 sub uid {
-    my $cert = shift;
-    $cert->{_uid} = shift if @_;
-    $cert->{_uid};
+    my $sig = shift;
+    $sig->{_uid} = shift if @_;
+    $sig->{_uid};
 }
 
 sub version {

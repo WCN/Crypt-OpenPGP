@@ -52,11 +52,11 @@ sub init {
             $key->alg eq 'RSA' or
                 return (ref $cert)->error("Version 3 keys must be RSA");
         }
-        $cert->{s2k} = Crypt::OpenPGP::S2k->new('Salt_Iter');
 
         if ($cert->{is_secret}) {
             $param{Passphrase} or
                 return (ref $cert)->error("Need a Passphrase to lock key");
+            $cert->{s2k}    = Crypt::OpenPGP::S2k->new('Salt_Iter');
             $cert->{cipher} = $param{Cipher} || DEFAULT_CIPHER;
             $cert->lock($param{Passphrase});
         }

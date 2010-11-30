@@ -135,7 +135,10 @@ sub init {
         $s2k->{count} = 96;
     }
     if ($s2k->{hash_alg}) {
-        $s2k->{hash} = Crypt::OpenPGP::Digest->new($s2k->{hash_alg});
+        my $hash = Crypt::OpenPGP::Digest->new($s2k->{hash_alg});
+        die "Failed to create hash: ".Crypt::OpenPGP::Digest->errstr
+          unless $hash;
+        $s2k->{hash} = $hash;
     }
     $s2k;
 }

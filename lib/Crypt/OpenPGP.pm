@@ -273,9 +273,12 @@ sub sign {
     }
     unless ($cert = $param{Key}) {
         my $kid = $param{KeyID} or return $pgp->error("No KeyID specified");
+        if($kid =~ m/^[0-9a-f]+$/i) {
+          $kid = pack("H*", $kid);
+        }
         my $ring = $pgp->secrings->[0]
             or return $pgp->error("No secret keyrings");
-        my $kb = $ring->find_keyblock_by_keyid(pack 'H*', $kid) or
+        my $kb = $ring->find_keyblock_by_keyid($kid) or
             return $pgp->error("Could not find secret key with KeyID $kid");
         $cert = $kb->signing_key;
         $cert->uid($kb->primary_uid);
@@ -591,7 +594,8 @@ sub decrypt {
     }
     my($key, $alg);
     if (ref($pieces[0]) eq 'Crypt::OpenPGP::SessionKey') {
-        my($sym_key, $cert, $ring) = (shift @pieces);   ## $cert, $ring left undef
+        my $sym_key = shift(@pieces);
+        my($cert, $ring);
 
         ## Get a specified certificate, or a keyring to search for a matching one on
         unless ($cert = $param{Key}) {

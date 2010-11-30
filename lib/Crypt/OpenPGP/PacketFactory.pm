@@ -132,10 +132,10 @@ sub save {
     my @objs = @_;
     my $ser = '';
     for my $obj (@objs) {
-        my $body = $obj->save;
-        my $len = length($body);
         my $type = $obj->can('pkt_type') ? $obj->pkt_type :
                    $PACKET_TYPES_BY_CLASS{ref($obj)};
+        my $body = $obj->save;
+        my $len = length($body);
         my $hdrlen = $obj->can('pkt_hdrlen') ? $obj->pkt_hdrlen : undef;
         my $buf = Crypt::OpenPGP::Buffer->new;
         if ($obj->{is_new} || $type > 15) {

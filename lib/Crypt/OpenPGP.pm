@@ -715,8 +715,9 @@ sub keygen {
     require Crypt::OpenPGP::Signature;
     require Crypt::OpenPGP::UserID;
 
-    $param{Type} or
+    unless($param{Type}) {
         return $pgp->error("Need a Type of key to generate");
+    }
     $param{Size}    ||= 1024;
     $param{Version} ||= 4;
 
@@ -750,7 +751,7 @@ sub keygen {
         Data        => [ $pubcert, $id ],
         Key         => $seccert,
         Signing     => 1,
-        Encrypting  => 1,
+        Encrypting  => $param{Subkey} ? 0 : 1,
         Digest      => $param{Digest},
     );
 
@@ -758,7 +759,9 @@ sub keygen {
     $kb_sec->add($sig);
 
     if($param{Subkey}) {
-        my($pubsubkey, $secsubkey) = Crypt::OpenPGP::Key->keygen($param{Type}, %param);
+        my $type = $param{Type} eq "DSA" ? "ElGamal" : "RSA";
+
+        my($pubsubkey, $secsubkey) = Crypt::OpenPGP::Key->keygen($type, %param);
         die Crypt::OpenPGP::Key->errstr unless $pubsubkey && $secsubkey;
 
         my $pubsubcert = Crypt::OpenPGP::Certificate->new(
@@ -815,6 +818,40 @@ sub _keygen_get_signature {
 
   if($param{'Digest'}) {
     $digest = Crypt::OpenPGP::Digest->alg_id( $param{'Digest'} );
+  }
+
+  ## Add a preferred encryption algorithm packet to this signature,
+  ## stating that we want all data in AES format, with 3DES as the
+  ## last option.
+  ##
+  unless($param{IsSubkey}) {
+    my $sp = Crypt::OpenPGP::Signature::SubPacket->new({
+      'type'    => 11,
+      'data'    => [ 9, 8, 7, 2 ],
+    });
+    push(@subpacket, $sp);
+  }
+
+  ## Add a preferred hash algorithm packet to this signature,
+  ## stating that we want to use SHA1.
+  ##
+  unless($param{IsSubkey}) {
+    my $sp = Crypt::OpenPGP::Signature::SubPacket->new({
+      'type'    => 21,
+      'data'    => [ 2 ],
+    });
+    push(@subpacket, $sp);
+  }
+
+  ## Add a preferred compression algorithm packet to this signature,
+  ## stating that we want to use ZLIB, BZIP2, or ZIP.
+  ##
+  unless($param{IsSubkey}) {
+    my $sp = Crypt::OpenPGP::Signature::SubPacket->new({
+      'type'    => 22,
+      'data'    => [ 2, 3, 1 ],
+    });
+    push(@subpacket, $sp);
   }
 
   ## Add a preferred encryption algorithm packet to this signature,

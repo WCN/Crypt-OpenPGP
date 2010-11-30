@@ -39,10 +39,10 @@ BEGIN {
 }
 
 for my $did ( sort { $a <=> $b } keys %TESTS ) {
-    diag $TESTS{ $did };
+    diag $TESTS{ $did }->{name};
     my $digest = Crypt::OpenPGP::Digest->new( $did );
     isa_ok $digest, 'Crypt::OpenPGP::Digest';
-    is $digest->alg, $TESTS{ $did }, 'algorithm name matches';
+    is $digest->alg, $TESTS{ $did }->{'name'}, 'algorithm name matches';
     is $digest->alg_id, $did, 'algorithm id matches';
     my $hash = $digest->hash( $data );
     is length( $hash ), $TESTDATA{ $did }[0], 'length of digest matches';

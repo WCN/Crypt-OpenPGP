@@ -15,9 +15,9 @@ use vars qw( %ALG %ALG_BY_NAME );
 sub new {
     my $class = shift;
     my $alg = shift;
-    $alg = $ALG{$alg}->{'name'} || $alg;
     return $class->error("Unsupported digest algorithm '$alg'")
         unless $alg =~ /^\D/;
+    $alg = $ALG{$alg}->{'name'} || $alg;
     my $pkg = join '::', $class, $alg;
     my $dig = bless { __alg => $alg,
                       __alg_id => $ALG_BY_NAME{$alg} }, $pkg;

@@ -30,7 +30,7 @@ sub encrypting_key {
 
 sub signing_key {
     my $kb = shift;
-    my @keys = grep { $_->can_encrypt }
+    my @keys = grep { $_->can_sign }
         @{ $kb->{pkt}->{'Crypt::OpenPGP::Certificate'} };
     if(@keys > 1) {
         my @masterkeys = grep { ! $_->is_subkey } @keys;

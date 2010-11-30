@@ -65,11 +65,11 @@ use vars qw( %SUBPACKET_TYPES %SIGNATURE_TYPES );
     20 => { name => 'Notation data',
             pkg  => 'Crypt::OpenPGP::Signature::SubPacket::NotationData' },
     21 => { name => 'Preferred hash algorithms',
-            r    => sub { [ unpack 'C', $_[0]->bytes ] },
+            r    => sub { [ unpack 'C*', $_[0]->bytes ] },
             w    => sub { $_[0]->put_bytes(pack 'C*', @{ $_[1] }) } },
 
     22 => { name => 'Preferred compression algorithms',
-            r    => sub { [ unpack 'C', $_[0]->bytes ] },
+            r    => sub { [ unpack 'C*', $_[0]->bytes ] },
             w    => sub { $_[0]->put_bytes(pack 'C*', @{ $_[1] }) } },
 
     23 => { name => 'Key server preferences',
@@ -162,6 +162,11 @@ sub data {
   return $sp->{'data'};
 }
 
+sub data_hex {
+  my $sp = shift;
+  return uc unpack('H*', $sp->{'data'});
+}
+
 sub type {
   my $sp = shift;
   return $sp->{'type'};
@@ -195,8 +200,11 @@ sub display {
   elsif(ref($val) eq "ARRAY") {
     push(@lines, "    values: '".join("', '", @$val)."'\n");
   }
-  else {
+  elsif($val =~ m/^[0-9a-zA-Z_.-]+$/) {
     push(@lines, "    value: '$val'\n");
+  }
+  else {
+    push(@lines, "    value: '".$sp->data_hex."'\n");
   }
   return @lines;
 }

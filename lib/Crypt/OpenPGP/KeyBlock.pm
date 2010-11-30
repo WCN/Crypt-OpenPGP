@@ -4,8 +4,11 @@ use strict;
 use Crypt::OpenPGP::PacketFactory;
 
 sub primary_uid {
-    $_[0]->{pkt}{ 'Crypt::OpenPGP::UserID' } ?
-        $_[0]->{pkt}{ 'Crypt::OpenPGP::UserID' }->[0]->id : undef;
+  my $kb  = shift;
+  return $kb->{'_primary_uid'} if $kb->{'_primary_uid'};
+  my @sigs = sort { $a->timestamp <=> $b->timestamp } $kb->all_self_sigs;
+  $kb->{'_primary_uid'} = $sigs[-1]->uid;
+  return $kb->{'_primary_uid'};
 }
 
 sub key { $_[0]->get('Crypt::OpenPGP::Certificate')->[0] }
@@ -47,15 +50,23 @@ sub init {
 }
 
 sub add {
-    my $kb = shift;
-    my($pkt) = @_;
+    my($kb, $pkt) = @_;
     push @{ $kb->{pkt}->{ ref($pkt) } }, $pkt;
     push @{ $kb->{order} }, $pkt;
+
     if (ref($pkt) eq 'Crypt::OpenPGP::Certificate') {
         my $kid = $pkt->key_id;
         $kb->{keys_by_id}{ $kid } = $pkt;
         $kb->{keys_by_short_id}{ substr $kid, -4, 4 } = $pkt;
     }
+    if (ref($pkt) eq 'Crypt::OpenPGP::Signature') {
+        if($kb->{pkt}->{'Crypt::OpenPGP::UserID'}) {
+            my $uid = $kb->{pkt}->{'Crypt::OpenPGP::UserID'}->[-1];
+            $pkt->uid($uid->id);
+        }
+    }
+    $pkt->keyblock($kb);
+    $kb;
 }
 
 sub get { $_[0]->{pkt}->{ $_[1] } }
@@ -73,6 +84,68 @@ sub save_armoured {
                 Object => 'PUBLIC KEY BLOCK'
         );
 }
+
+sub display {
+    my $kb = shift;
+    my @lines;
+
+    push(@lines, __PACKAGE__ . ":\n");
+    foreach my $pkt (@{ $kb->{'order'} }) {
+        my @tmp = $pkt->display();
+        push(@lines, map { "    $_" } @tmp);
+    }
+    return @lines;
+}
+
+sub all_user_ids {
+  my $kb  = shift;
+  my @out = ();
+  unless($kb->{pkt} && $kb->{pkt}->{'Crypt::OpenPGP::UserID'}) {
+    return;
+  }
+  foreach my $uid (@{ $kb->{pkt}->{'Crypt::OpenPGP::UserID'} }) {
+    push(@out, $uid->id);
+  }
+  return @out;
+}
+
+sub all_keys {
+  my $kb = shift;
+  return @{ $kb->{'pkt'}->{'Crypt::OpenPGP::Certificate'} };
+}
+
+sub all_signatures {
+  my $kb = shift;
+  return @{ $kb->{'pkt'}->{'Crypt::OpenPGP::Signature'} };
+}
+
+sub all_self_sigs {
+  my $kb = shift;
+  my(@out, %keys);
+
+  foreach my $cert (@{ $kb->{'pkt'}->{'Crypt::OpenPGP::Certificate'} }) {
+    $keys{ $cert->key_id_hex } = $cert;
+  }
+  foreach my $sig (@{ $kb->{'pkt'}->{'Crypt::OpenPGP::Signature'} }) {
+    my $keyId = $sig->key_id_hex || next;
+    next unless $keys{ $keyId };
+    push(@out, $sig);
+  }
+  return @out;
+}
+
+sub self_sigs {
+  my($kb, $key_id) = @_;
+  my @out;
+  foreach my $sig (@{ $kb->{'pkt'}->{'Crypt::OpenPGP::Signature'} }) {
+    if($sig->key_id && $sig->key_id eq $key_id) {
+      push(@out, $sig);
+    }
+  }
+  return @out;
+}
+
+
 
 1;
 __END__
@@ -136,6 +209,43 @@ or can be written out to a keyring file.
 
 Saves an armoured version of the keyblock (this is useful for exporting
 public keys).
+
+=head2 $kb->display
+
+Returns a list of strings that can be shown to the user, describing
+the contents of this keyblock.
+
+=head2 $kb->all_user_ids
+
+Returns a list of all user ids (as strings) that are defined in this
+keyblock. This will be a list of all email addresses associated with
+this key.
+
+=head2 $kb->all_keys
+
+Returns a list of L<Crypt::OpenPGP::Certificate> objects that are
+defined within this keyblock. This will include a single master key,
+and zero or more subkeys.
+
+=head2 $kb->all_signatures
+
+Returns a list of L<Crypt::OpenPGP::Signature> objects that are
+defined within this keyblock. There will be at least one self
+signature block (that is, signed by the master key) to associate the
+master key with a user id. There may well be signature blocks to bind
+the master key to the subkeys, and signature blocks from other users
+certifying that this key is associated with this user id.
+
+=head2 $kb->all_self_sigs
+
+Returns a list of L<Crypt::OpenPGP::Signature> objects that are
+defined within this keyblock, and signed by one of the keys in this
+keyblock (as opposed to signatures signed by other users).
+
+=head2 $kb->self_sigs($keyId)
+
+Returns a list of L<Crypt::OpenPGP::Signature> objects that are signed
+by the specified key id.
 
 =head1 AUTHOR & COPYRIGHTS
 

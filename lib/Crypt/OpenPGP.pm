@@ -11,6 +11,14 @@ use Crypt::OpenPGP::Plaintext;
 use Crypt::OpenPGP::Message;
 use Crypt::OpenPGP::PacketFactory;
 use Crypt::OpenPGP::Config;
+use Crypt::OpenPGP::Certificate;
+use Crypt::OpenPGP::Key;
+use Crypt::OpenPGP::KeyBlock;
+use Crypt::OpenPGP::Signature;
+use Crypt::OpenPGP::Signature::SubPacket;
+use Crypt::OpenPGP::UserID;
+use Crypt::OpenPGP::Digest;
+use Crypt::OpenPGP::Armour;
 
 use Crypt::OpenPGP::ErrorHandler;
 use base qw( Crypt::OpenPGP::ErrorHandler );
@@ -440,7 +448,8 @@ sub encrypt {
                          Armour     => 0,
                          Passphrase => $param{SignPassphrase},
                          PassphraseCallback => $param{SignPassphraseCallback},
-                  )
+                         Digest     => $param{Digest},
+                        )
             or return;
     } else {
         my $pt = Crypt::OpenPGP::Plaintext->new( Data => $data,
@@ -582,7 +591,9 @@ sub decrypt {
     }
     my($key, $alg);
     if (ref($pieces[0]) eq 'Crypt::OpenPGP::SessionKey') {
-        my($sym_key, $cert, $ring) = (shift @pieces);
+        my($sym_key, $cert, $ring) = (shift @pieces);   ## $cert, $ring left undef
+
+        ## Get a specified certificate, or a keyring to search for a matching one on
         unless ($cert = $param{Key}) {
             $ring = $pgp->secrings->[0]
                 or return $pgp->error("No secret keyrings");
@@ -597,6 +608,8 @@ sub decrypt {
                 }
             } else {
                 if ($kb = $ring->find_keyblock_by_keyid($sym_key->key_id)) {
+                    $cert = $kb->key_by_id($sym_key->key_id);
+                    $cert->uid($kb->primary_uid);
                     shift @pieces
                         while ref($pieces[0]) eq 'Crypt::OpenPGP::SessionKey';
                     last;
@@ -605,11 +618,7 @@ sub decrypt {
             $sym_key = shift @pieces;
         }
         return $pgp->error("Can't find a secret key to decrypt message")
-            unless $kb || $cert;
-        if ($kb) {
-            $cert = $kb->encrypting_key;
-            $cert->uid($kb->primary_uid);
-        }
+            unless $cert;
         if ($cert->is_protected) {
             my $pass = $param{Passphrase};
             if (!defined $pass && (my $cb = $param{PassphraseCallback})) {
@@ -708,43 +717,156 @@ sub keygen {
 
     $param{Type} or
         return $pgp->error("Need a Type of key to generate");
-    $param{Size} ||= 1024;
+    $param{Size}    ||= 1024;
     $param{Version} ||= 4;
-    $param{Version} = 3 if $param{Type} eq 'RSA';
 
     my $kb_pub = Crypt::OpenPGP::KeyBlock->new;
     my $kb_sec = Crypt::OpenPGP::KeyBlock->new;
 
     my($pub, $sec) = Crypt::OpenPGP::Key->keygen($param{Type}, %param);
     die Crypt::OpenPGP::Key->errstr unless $pub && $sec;
+
+    my $id = Crypt::OpenPGP::UserID->new( Identity => $param{Identity} );
+
     my $pubcert = Crypt::OpenPGP::Certificate->new(
-                             Key        => $pub,
-                             Version    => $param{Version}
-                ) or
-        die Crypt::OpenPGP::Certificate->errstr;
+        Key        => $pub,
+        Version    => $param{Version},
+        UserID     => $param{Identity},
+    ) or die Crypt::OpenPGP::Certificate->errstr;
     my $seccert = Crypt::OpenPGP::Certificate->new(
-                             Key        => $sec,
-                             Passphrase => $param{Passphrase},
-                             Version    => $param{Version}
-                ) or
-        die Crypt::OpenPGP::Certificate->errstr;
+        Key        => $sec,
+        Passphrase => $param{Passphrase},
+        Version    => $param{Version},
+        UserID     => $param{Identity},
+    ) or die Crypt::OpenPGP::Certificate->errstr;
+
     $kb_pub->add($pubcert);
     $kb_sec->add($seccert);
 
-    my $id = Crypt::OpenPGP::UserID->new( Identity => $param{Identity} );
     $kb_pub->add($id);
     $kb_sec->add($id);
 
-    my $sig = Crypt::OpenPGP::Signature->new(
-                             Data    => [ $pubcert, $id ],
-                             Key     => $seccert,
-                             Version => $param{Version},
-                             Type    => 0x13,
-               );
+    my $sig = $pgp->_keygen_get_signature(
+        Data        => [ $pubcert, $id ],
+        Key         => $seccert,
+        Signing     => 1,
+        Encrypting  => 1,
+        Digest      => $param{Digest},
+    );
+
     $kb_pub->add($sig);
     $kb_sec->add($sig);
 
+    if($param{Subkey}) {
+        my($pubsubkey, $secsubkey) = Crypt::OpenPGP::Key->keygen($param{Type}, %param);
+        die Crypt::OpenPGP::Key->errstr unless $pubsubkey && $secsubkey;
+
+        my $pubsubcert = Crypt::OpenPGP::Certificate->new(
+            Key        => $pubsubkey,
+            Version    => $param{Version},
+            UserID     => $param{Identity},
+            Subkey     => 1,
+        ) or die Crypt::OpenPGP::Certificate->errstr;
+
+        my $secsubcert = Crypt::OpenPGP::Certificate->new(
+            Key        => $secsubkey,
+            Passphrase => $param{Passphrase},
+            Version    => $param{Version},
+            UserID     => $param{Identity},
+            Subkey     => 1,
+        ) or die Crypt::OpenPGP::Certificate->errstr;
+
+        my $subsig = $pgp->_keygen_get_signature(
+            Data        => [ $pubcert, $pubsubcert ],
+            Key         => $seccert,
+            Signing     => 0,
+            Encrypting  => 1,
+            Digest      => $param{Digest},
+            IsSubkey    => 1,
+        );
+
+        $kb_pub->add($pubsubcert);
+        $kb_pub->add($subsig);
+
+        $kb_sec->add($secsubcert);
+        $kb_sec->add($subsig);
+    }
     ($kb_pub, $kb_sec);
+}
+
+## Internal method, generates a signature packet on some data using a
+## specified key. Accepts the following arguments:-
+##   Data       - Data to sign (an arrayref of objects). Required.
+##   Key        - Crypt::OpenPGP::Key containing secret key. Required.
+##   IsSubkey   - boolean - true for signatures on subkeys
+##   Signing    - Signature should indicate that this key can be used
+##                for signing
+##   Encrypting - Signature should indicate that this key can be used
+##                for encrypting data
+##   Digest     - The id of the digest algorithm to use.
+##
+sub _keygen_get_signature {
+  my($pgp, %param) = @_;
+
+  my $data    = $param{Data},
+  my $key     = $param{Key};
+  my $digest;
+  my @subpacket;
+
+  if($param{'Digest'}) {
+    $digest = Crypt::OpenPGP::Digest->alg_id( $param{'Digest'} );
+  }
+
+  ## Add a preferred encryption algorithm packet to this signature,
+  ## stating that we want all data in AES format, with 3DES as the
+  ## last option...
+  unless($param{IsSubkey}) {
+    my $sp = Crypt::OpenPGP::Signature::SubPacket->new({
+      'type'    => 11,
+      'data'    => [ 9, 8, 7, 2 ],
+    });
+    push(@subpacket, $sp);
+  }
+
+  unless($param{IsSubkey}) {
+    my $sp = Crypt::OpenPGP::Signature::SubPacket->new({
+      'type'    => 25,
+      'data'    => 1,
+    });
+    push(@subpacket, $sp);
+  }
+
+  ## Add a key flags packet to this signature, stating that this key
+  ## is for certifying other keys and signing data.....
+  {
+    require Crypt::OpenPGP::Signature::SubPacket::KeyFlags;
+    my $sp = Crypt::OpenPGP::Signature::SubPacket::KeyFlags->new();
+    $sp->can_certify_other_keys(1)        if $param{Signing};
+    $sp->can_sign_data(1)                 if $param{Signing};
+    $sp->can_encrypt_communications(1)    if $param{Encrypting};
+    $sp->can_encrypt_storage(1)           if $param{Encrypting};
+    push(@subpacket, $sp);
+  }
+
+  ## Add a features packet to this signature, stating that we support
+  ## modification detection....
+  unless($param{IsSubkey}) {
+    require Crypt::OpenPGP::Signature::SubPacket::Features;
+    my $sp = Crypt::OpenPGP::Signature::SubPacket::Features->new({
+      'data'    => 1,
+    });
+    push(@subpacket, $sp);
+  }
+
+  my $sig = Crypt::OpenPGP::Signature->new(
+    Data      => $data,
+    Key       => $key,
+    Version   => $param{Version},
+    Type      => $param{IsSubkey} ? 0x18 : 0x13,
+    Digest    => $digest,
+    SubPacket => \@subpacket,
+  );
+  return $sig;
 }
 
 sub _read_files {
@@ -1608,6 +1730,14 @@ String with which the secret key will be encrypted. When read in from
 disk, the key can then only be unlocked using this string.
 
 This is a required argument.
+
+=item * Subkey
+
+Boolean - if true, we will generate two keys for you, one for signing,
+the other for encryption. This is done by GnuPG (for example), as it
+is considered "Good Practice" to use different keys for each purpose.
+The encrypting key will be generated as a subkey of the signing key,
+and will be signed by it.
 
 =item * Version
 

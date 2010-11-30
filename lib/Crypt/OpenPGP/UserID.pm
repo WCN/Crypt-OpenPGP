@@ -3,6 +3,7 @@ use strict;
 
 use Crypt::OpenPGP::ErrorHandler;
 use base qw( Crypt::OpenPGP::ErrorHandler );
+use Scalar::Util qw( weaken );
 
 sub new {
     my $id = bless { }, shift;
@@ -32,6 +33,19 @@ sub save { $_[0]->{id} }
 sub display {
   my $self = shift;
   return sprintf("%s: %s\n", __PACKAGE__, $self->{'id'});
+}
+
+sub keyblock {
+    my $id = shift;
+    if(@_) {
+        my $kb = shift;
+        $id->{'_keyblock'} = $kb;
+        weaken($id->{'_keyblock'});
+        return $kb;
+    }
+    else {
+        return $id->{'_keyblock'};
+    }
 }
 
 1;

@@ -28,6 +28,7 @@ sub keygen {
     ($pub, $sec);
 }
 
+sub crypt_props { }
 sub public_props { qw( p q g y ) }
 sub sig_props { qw( r s ) }
 

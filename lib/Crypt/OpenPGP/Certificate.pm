@@ -14,6 +14,7 @@ use Crypt::OpenPGP::Constants qw( DEFAULT_CIPHER
 use Crypt::OpenPGP::Cipher;
 use Crypt::OpenPGP::ErrorHandler;
 use base qw( Crypt::OpenPGP::ErrorHandler );
+use Scalar::Util qw( weaken );
 
 {
     my @PKT_TYPES = (
@@ -44,6 +45,8 @@ sub init {
         $cert->{is_subkey} = $param{Subkey} || 0;
         $cert->{timestamp} = time;
         $cert->{pk_alg} = $key->alg_id;
+        $cert->{_uid} = $param{UserID};
+
         if ($cert->{version} < 4) {
             $cert->{validity} = $param{Validity} || 0;
             $key->alg eq 'RSA' or
@@ -78,6 +81,25 @@ sub uid {
     $cert->{_uid};
 }
 
+sub keyblock {
+    my $cert = shift;
+    if(@_) {
+        my $kb = shift;
+        $cert->{'_keyblock'} = $kb;
+        weaken($cert->{'_keyblock'});
+        return $kb;
+    }
+    else {
+        return $cert->{'_keyblock'};
+    }
+}
+
+sub self_signatures {
+    my $cert = shift;
+    return $cert->{'_self_signature'} if $cert->{'_self_signature'};
+    my $kb   = $cert->keyblock || return;
+    return $kb->self_sigs( $cert->key_id );
+}
 
 sub public_cert {
     my $cert = shift;

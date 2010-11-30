@@ -21,8 +21,17 @@ sub new {
 sub init {
   my($ring, %param) = @_;
 
+  require Crypt::OpenPGP::Armour;
+
   if($param{Data}) {
-    $ring->{_data} = $param{Data};
+    my $data = $param{Data};
+    if ($data =~ /-----BEGIN/) {
+      my $tmp = Crypt::OpenPGP::Armour->unarmour($data) or
+        return (ref $ring)->error("Unarmour failed: " .
+                                    Crypt::OpenPGP::Armour->errstr);
+      $data = $tmp->{Data};
+    }
+    $ring->{_data} = $data;
   }
   else {
     my(@files, @data);
@@ -37,7 +46,6 @@ sub init {
       close $fh;
 
       if ($data =~ /-----BEGIN/) {
-        require Crypt::OpenPGP::Armour;
         my $rec = Crypt::OpenPGP::Armour->unarmour($data) or
           return (ref $ring)->error("Unarmour failed: " .
                                       Crypt::OpenPGP::Armour->errstr);
@@ -119,6 +127,12 @@ sub find_keyblock_by_index {
     ## XXX should not have to read entire keyring
     $ring->read;
     ($ring->blocks)[$index];
+}
+
+sub keyblock_count {
+    my $ring = shift;
+    $ring->read;
+    return scalar($ring->blocks);
 }
 
 sub find_keyblock {

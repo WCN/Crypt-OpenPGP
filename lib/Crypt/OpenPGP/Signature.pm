@@ -1,12 +1,14 @@
 package Crypt::OpenPGP::Signature;
 use strict;
 
+use base qw( Crypt::OpenPGP::ErrorHandler );
+
+use Scalar::Util qw( weaken );
 use Crypt::OpenPGP::Digest;
 use Crypt::OpenPGP::Signature::SubPacket;
 use Crypt::OpenPGP::Key::Public;
 use Crypt::OpenPGP::Constants qw( DEFAULT_DIGEST );
 use Crypt::OpenPGP::ErrorHandler;
-use base qw( Crypt::OpenPGP::ErrorHandler );
 
 use vars qw( %SIGNATURE_TYPES );
 %SIGNATURE_TYPES = (
@@ -43,6 +45,30 @@ sub key_id_hex {
     return uc unpack('H*', $sig->key_id);
 }
 
+sub keyblock {
+    my $sig = shift;
+    if(@_) {
+        my $kb = shift;
+        $sig->{'_keyblock'} = $kb;
+        weaken($sig->{'_keyblock'});
+        return $kb;
+    }
+    else {
+        return $sig->{'_keyblock'};
+    }
+}
+
+sub uid {
+    my $cert = shift;
+    $cert->{_uid} = shift if @_;
+    $cert->{_uid};
+}
+
+sub version {
+    my $sig = shift;
+    return $sig->{version};
+}
+
 sub timestamp {
     my $sig = shift;
     return $sig->{timestamp} if $sig->{version} < 4;
@@ -53,11 +79,11 @@ sub timestamp {
 sub expiration_time {
     my $sig = shift;
     return $sig->{timestamp} if $sig->{version} < 4;
-    my $sp = $sig->find_subpacket(2) || return;
+    my $sp = $sig->find_subpacket(9) || return;
     return $sp->data;
 }
 
-sub primary_user_id {
+sub is_primary_user_id {
     my $sig = shift;
     my $sp = $sig->find_subpacket(25) || return;
     return $sp->data;
@@ -65,20 +91,26 @@ sub primary_user_id {
 
 sub preferred_symmetric_algorithms {
     my $sig = shift;
-    my $sp = $sig->find_subpacket(11) || return;
+    my $sp  = $sig->find_subpacket(11) || return;
     return $sp->data;
 }
 
 sub preferred_hash_algorithms {
     my $sig = shift;
-    my $sp = $sig->find_subpacket(21) || return;
+    my $sp  = $sig->find_subpacket(21) || return;
     return $sp->data;
 }
 
 sub preferred_compression_algorithms {
     my $sig = shift;
-    my $sp = $sig->find_subpacket(22) || return;
+    my $sp  = $sig->find_subpacket(22) || return;
     return $sp->data;
+}
+
+sub key_flags {
+    my $sig = shift;
+    my $sp  = $sig->find_subpacket(27) || return;
+    return $sp->flags;
 }
 
 sub digest {
@@ -134,14 +166,14 @@ sub display {
 
   }
   else {
-    push(@lines, "  HASHED SUBPACKETS:\n");
+#    push(@lines, "  HASHED SUBPACKETS:\n");
     foreach my $subpacket (@{$self->{'subpackets_hashed'}}) {
       my @tmp = $subpacket->display;
       foreach my $line (@tmp) {
         push(@lines, "    $line");
       }
     }
-    push(@lines, "  UNHASHED SUBPACKETS:\n");
+#    push(@lines, "  UNHASHED SUBPACKETS:\n");
     foreach my $subpacket (@{$self->{'subpackets_unhashed'}}) {
       my @tmp = $subpacket->display;
       foreach my $line (@tmp) {
@@ -519,6 +551,24 @@ This is a standard OpenPGP signature.
 
 Returns the ID of the key that created the signature.
 
+=head2 $sig->key_id_hex
+
+Returns the ID of the key that created the signature in readable form.
+
+=head2 $sig->keyblock
+
+Accessor for the parent keyblock that this key was defined in.
+
+=head2 $sig->uid
+
+The user id that this signature is signing, if any. Note that this is
+not the same as the person who made the signature - rather, signatures
+within keyblocks exist to associate a username with a key.
+
+=head2 $sig->version
+
+The signature version.
+
 =head2 $sig->timestamp
 
 Returns the time that the signature was created in Unix epoch time (seconds
@@ -528,10 +578,12 @@ since 1970).
 
 Returns the unix time at which the signature expires.
 
-=head2 $sig->digest
+=head2 $sig->is_primary_user_id
 
-Returns a Crypt::OpenPGP::Digest object representing the digest algorithm
-used by the signature.
+Returns true if this signature contains a subpacket, identifying the
+signed user_id as the primary user id for this key. Note that keys
+may well contain multiple such signatures - if so, then they should
+be sorted on timestamp order.
 
 =head2 $sub->preferred_symmetric_algorithms
 
@@ -550,6 +602,31 @@ up via L<Crypt::OpenPGP::Digest>
 Returns an arrayref of the key issuer's preferred compression
 algorithms. This will be an arrayref of numbers, which can be looked
 up via L<Crypt::OpenPGP::Compressed>
+
+=head2 $sub->key_flags
+
+Returns an L<Crypt::OpenPGP::Signature::SubPacket::KeyFlags> object,
+if such a subpacket exists within this signature. This is used when
+signing keys to indicate that a key should be used for encryption,
+for signing other keys, etc.
+
+=head2 $sig->digest
+
+Returns a Crypt::OpenPGP::Digest object representing the digest
+algorithm used by the signature.
+
+=head2 find_subpacket($id)
+
+Returns the first L<Crypt::OpenPGP::Signature::Subpacket> with the
+specified subpacket id (eg, 2 is used for signature timestamp). Only
+version 4 signatures will ever return anything from this method.
+
+=head2 signature_type()
+
+Returns a human readable string describing the type of signature that
+this is. 15 signature types are defined by the OpenPGP standard, for
+example "Generic Certification of User Id and Public Key". See RFC
+4880 for more details.
 
 =head1 AUTHOR & COPYRIGHTS
 

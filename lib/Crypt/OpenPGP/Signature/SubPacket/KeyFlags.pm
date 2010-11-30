@@ -32,6 +32,16 @@ sub display {
            map { "    $_: '".$self->$_."'\n" } sort keys %FEATURES );
 }
 
+sub flags {
+  my $self = shift;
+  my %out  = ();
+  foreach my $key (keys %FEATURES) {
+    my $val = $FEATURES{$key};
+    $out{ $key } = ($self->{'data'} & $val) ? 1 : 0;
+  }
+  return \%out;
+}
+
 {
   no strict 'refs';
   foreach my $meth (keys %FEATURES) {

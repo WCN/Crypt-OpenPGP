@@ -741,6 +741,7 @@ sub keygen {
     my $seccert = Crypt::OpenPGP::Certificate->new(
         Key        => $sec,
         Passphrase => $param{Passphrase},
+        Cipher     => $param{Cipher},
         Version    => $param{Version},
         UserID     => $param{Identity},
     ) or die Crypt::OpenPGP::Certificate->errstr;
@@ -778,6 +779,7 @@ sub keygen {
         my $secsubcert = Crypt::OpenPGP::Certificate->new(
             Key        => $secsubkey,
             Passphrase => $param{Passphrase},
+            Cipher     => $param{Cipher},
             Version    => $param{Version},
             UserID     => $param{Identity},
             Subkey     => 1,

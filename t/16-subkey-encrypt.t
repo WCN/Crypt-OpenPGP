@@ -93,7 +93,7 @@ is($data, $txt, "Data has been decrypted successfully");
 is($valid, 'Bill Billage <bill@example.com>', 'Signature valid ok');
 
 isa_ok($sig, "Crypt::OpenPGP::Signature", "Signature present ok");
-is($sig->key_id_hex, "CF7FCA066DEF6B59",
+is($sig->key_id_hex, "4459B35D6BB0BE15",
    "Signature made by Billage's signing key");
 ok(time() - $sig->timestamp < 600, "Signature within last 10 mins");
 
@@ -128,7 +128,7 @@ is(@{ $msg->{pieces} }, 2, "Message has 2 pieces");
 
 ok($sk = $msg->{pieces}->[0], "Get first piece");
 isa_ok($sk, "Crypt::OpenPGP::SessionKey", "Got a session key");
-is($sk->key_id_hex, "089A43D9C5E0326A",
+is($sk->key_id_hex, "54E12CC820CAEB32",
    "Key id is Billage's encrypting sub key");
 
 isa_ok($msg->{pieces}->[1], "Crypt::OpenPGP::Ciphertext",

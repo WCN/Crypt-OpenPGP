@@ -22,6 +22,7 @@ my($pub, $sec) = $pgp->keygen(
   Passphrase  => $pass,
   Identity    => $uid,
   Subkey      => 1,
+  Cipher      => 7,
 );
 
 isa_ok($pub, "Crypt::OpenPGP::KeyBlock", "Got a public keyblock ok");

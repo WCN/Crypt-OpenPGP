@@ -219,8 +219,8 @@ sub parse {
                 $cert->{s2k} = Crypt::OpenPGP::S2k->new('Simple');
                 $cert->{s2k}->set_hash('MD5');
             }
-
-            $cert->{iv} = $buf->get_bytes(8);
+            my $cipher = Crypt::OpenPGP::Cipher->new( $cert->{'cipher'} );
+            $cert->{iv} = $buf->get_bytes( $cipher->blocksize );
         }
 
         if ($cert->{is_protected}) {
@@ -367,10 +367,13 @@ sub lock {
     my $cert = shift;
     return if !$cert->{is_secret} || $cert->{is_protected};
     my($passphrase) = @_;
-    my $cipher = Crypt::OpenPGP::Cipher->new($cert->{cipher});
+
+    my $cipher  = Crypt::OpenPGP::Cipher->new($cert->{cipher});
     my $sym_key = $cert->{s2k}->generate($passphrase, $cipher->keysize);
+    my $bsize   = $cipher->blocksize;
+
     require Crypt::Random;
-    $cert->{iv} = Crypt::Random::makerandom_octet( Length => 8 );
+    $cert->{iv} = Crypt::Random::makerandom_octet( Length => $bsize );
     $cipher->init($sym_key, $cert->{iv});
     my @sec = $cert->{key}->secret_props;
     if ($cert->{version} < 4) {

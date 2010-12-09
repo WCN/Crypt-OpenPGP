@@ -15,6 +15,7 @@ use Crypt::OpenPGP::Certificate;
 use Crypt::OpenPGP::Key;
 use Crypt::OpenPGP::KeyBlock;
 use Crypt::OpenPGP::Signature;
+use Crypt::OpenPGP::OnePassSig;
 use Crypt::OpenPGP::Signature::SubPacket;
 use Crypt::OpenPGP::UserID;
 use Crypt::OpenPGP::Digest;
@@ -265,7 +266,7 @@ sub sign {
     $pgp->_merge_compat(\%param, 'sign') or
         return $pgp->error( $pgp->errstr );
     my($cert, $data);
-    require Crypt::OpenPGP::Signature;
+
     unless ($data = $param{Data}) {
         my $file = $param{Filename} or
             return $pgp->error("Need either 'Data' or 'Filename' to sign");
@@ -312,17 +313,28 @@ sub sign {
         @sigarg = ( Digest => $dgst->alg_id );
     }
     push @sigarg, (Type => 0x01) if $param{Clearsign};
+
     my $sig = Crypt::OpenPGP::Signature->new(
                           Data => $pt,
                           Key  => $cert,
                           Version => $param{Version},
                           @sigarg,
                  );
+
     if ($param{Clearsign}) {
         $param{Armour} = $param{Detach} = 1;
     }
-    my $sig_data = Crypt::OpenPGP::PacketFactory->save($sig,
-        $param{Detach} ? () : ($pt));
+
+    my @parts = ();
+    if($param{Detach}) {
+      @parts = ($sig);
+    }
+    else {
+      my $onepass = Crypt::OpenPGP::OnePassSig->new($sig);
+      @parts = ($onepass, $pt, $sig);
+    }
+    my $sig_data = Crypt::OpenPGP::PacketFactory->save(@parts);
+
     if ($param{Armour}) {
         require Crypt::OpenPGP::Armour;
         $sig_data = Crypt::OpenPGP::Armour->armour(

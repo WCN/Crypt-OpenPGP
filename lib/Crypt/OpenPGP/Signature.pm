@@ -61,7 +61,40 @@ sub keyblock {
 sub type {
     my $sig = shift;
     return $sig->{type};
-  }
+}
+
+sub type_name {
+    my $sig  = shift;
+    my $type = shift || $sig->{'type'};
+    return $SIGNATURE_TYPES{ $type } || "UNKNOWN";
+}
+
+sub signature_type {
+    my $sig = shift;
+    return $sig->type_name;
+}
+
+sub hash_alg {
+    my $sig = shift;
+    return $sig->{'hash_alg'};
+}
+
+sub hash_alg_name {
+  my $sig  = shift;
+  my $hash = Crypt::OpenPGP::Digest->alg($sig->{'hash_alg'});
+  return $hash;
+}
+
+sub pk_alg {
+    my $sig = shift;
+    return $sig->{'pk_alg'};
+}
+
+sub pk_alg_name {
+  my $sig  = shift;
+  my $alg  = Crypt::OpenPGP::Key->alg($sig->{'pk_alg'});
+  return $alg;
+}
 
 sub uid {
     my $sig = shift;
@@ -132,11 +165,6 @@ sub find_subpacket {
     }
 }
 
-sub signature_type {
-  my $sp = shift;
-  return $SIGNATURE_TYPES{ $sp->{'type'} } || "UNKNOWN";
-}
-
 sub signature_data {
   my $sig = shift;
   my $key = Crypt::OpenPGP::Key::Public->new($sig->{pk_alg})
@@ -158,27 +186,22 @@ sub new {
 sub display {
   my $self = shift;
 
-  my $alg  = Crypt::OpenPGP::Key->alg($self->{'pk_alg'});
-  my $hash = Crypt::OpenPGP::Digest->alg($self->{'hash_alg'});
   my @lines;
-
   my $str = sprintf("%s: version %d, type %d (%s), algo: %s, %s\n",
-                    __PACKAGE__, $self->{'version'}, $self->{'type'},
-                    $self->signature_type, $alg, $hash);
+                    __PACKAGE__, $self->version, $self->type,
+                    $self->type_name, $self->pk_alg_name,
+                    $self->hash_alg_name);
   push(@lines, $str);
 
   if($self->{'version'} < 4) {
-
   }
   else {
-#    push(@lines, "  HASHED SUBPACKETS:\n");
     foreach my $subpacket (@{$self->{'subpackets_hashed'}}) {
       my @tmp = $subpacket->display;
       foreach my $line (@tmp) {
         push(@lines, "    $line");
       }
     }
-#    push(@lines, "  UNHASHED SUBPACKETS:\n");
     foreach my $subpacket (@{$self->{'subpackets_unhashed'}}) {
       my @tmp = $subpacket->display;
       foreach my $line (@tmp) {
@@ -574,6 +597,36 @@ within keyblocks exist to associate a username with a key.
 
 The signature version.
 
+=head2 $sig->type
+
+Returns the "type" of signature that this is, eg "0" means "signature
+of a binary document".
+
+=head2 $sig->type_name
+
+Returns a human readable string describing the type of signature that
+this is. 15 signature types are defined by the OpenPGP standard, for
+example "Generic Certification of User Id and Public Key". See RFC
+4880 for more details.
+
+=head2 $sig->hash_alg
+
+Returns the hash algorithm id for this signature. These (numeric) ids
+can be looked up via L<Crypt::OpenPGP::Digest>.
+
+=head2 $sig->hash_alg_name
+
+Returns a name for the hash algorithm.
+
+=head2 $sig->pk_alg
+
+Returns the public key algorithm id for this signature. These ids can
+be looked up via L<Crypt::OpenPGP::Key>.
+
+=head2 $sig->pk_alg_name
+
+Returns a name for the public key algorithm.
+
 =head2 $sig->timestamp
 
 Returns the time that the signature was created in Unix epoch time (seconds
@@ -625,13 +678,6 @@ algorithm used by the signature.
 Returns the first L<Crypt::OpenPGP::Signature::Subpacket> with the
 specified subpacket id (eg, 2 is used for signature timestamp). Only
 version 4 signatures will ever return anything from this method.
-
-=head2 signature_type()
-
-Returns a human readable string describing the type of signature that
-this is. 15 signature types are defined by the OpenPGP standard, for
-example "Generic Certification of User Id and Public Key". See RFC
-4880 for more details.
 
 =head1 AUTHOR & COPYRIGHTS
 

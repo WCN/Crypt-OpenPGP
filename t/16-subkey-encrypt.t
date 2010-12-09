@@ -84,6 +84,7 @@ isa_ok($msg->{pieces}->[1], "Crypt::OpenPGP::Ciphertext",
        "Got some ciphertext in the second piece");
 
 
+
 ok(my($data, $valid, $sig) = $pgp2->decrypt(
   Data        => $enc,
   Passphrase  => $pass2,

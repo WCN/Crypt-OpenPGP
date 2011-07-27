@@ -47,7 +47,10 @@ sub init {
         ## Make temp variable, because Rijndael checks SvPOK, which
         ## doesn't seem to like a value that isn't a variable?
         my $tmp = substr $key, 0, $ciph->keysize;
-        my $c = $class->new($tmp);
+	## Make sure we use an untainted version of the key.
+	## SvPOK used ind Rijndael doesnt like tainted values.
+	my ( $u_tmp ) = ( $tmp =~ /(.*)/s );
+        my $c = $class->new($u_tmp);
         $ciph->{cipher} = Crypt::OpenPGP::CFB->new($c, $iv);
     }
     $ciph;
